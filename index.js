@@ -50,25 +50,29 @@ function createListingEmbed(item) {
     )
     .setFooter({ text: `ID: ${item.id}` })
     .setTimestamp();
-
+  
   if (item.photo?.image?.medium_url) {
     embed.setImage(item.photo.image.medium_url);
   }
   return embed;
 }
 
-async function findAndPost(brand, channel) {
+async function findAndPost(brand, message) {
   const items = await searchVinted(brand);
+
   if (items.length === 0) {
-    return await channel.send(`❌ Aucune annonce trouvée pour "${brand}".`);
+    return await message.reply(`❌ Aucune annonce trouvée pour "${brand}".`);
   }
 
   const filteredItems = items.filter(item => !postedListings.has(item.id));
-  if (filteredItems.length === 0) return;
+
+  if (filteredItems.length === 0) {
+    return await message.reply(`✅ Aucune nouvelle annonce pour "${brand}".`);
+  }
 
   for (const item of filteredItems.slice(0, 5)) {
     const embed = createListingEmbed(item);
-    await channel.send({ embeds: [embed] });
+    await message.reply({ embeds: [embed], allowedMentions: { repliedUser: false } });
     postedListings.add(item.id);
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
@@ -82,7 +86,7 @@ client.once('ready', () => {
     const channel = client.channels.cache.get(VINTED_CHANNEL_ID);
     if (channel) {
       for (const brand of DEFAULT_BRANDS) {
-        await findAndPost(brand, channel);
+        await findAndPost(brand, { reply: async (opts) => channel.send(opts) });
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
@@ -92,22 +96,27 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.content.startsWith('!vinted')) return;
 
-  const args = message.content.slice(7).trim().split(/ +/);
-  const command = args[0]?.toLowerCase();
+  try {
+    const args = message.content.slice(7).trim().split(/ +/);
+    const command = args[0]?.toLowerCase();
 
-  if (command === 'find') {
-    const brand = args.slice(1).join(' ') || 'Nike';
-    await message.reply(`🔍 Recherche "${brand}"...`);
-    await findAndPost(brand, message.channel);
-  } else if (command === 'help') {
-    const helpEmbed = new EmbedBuilder()
-      .setTitle('🛍️ Vinqor - Aide')
-      .setColor('#00B4D8')
-      .addFields(
-        { name: '!vinted find [marque]', value: 'Cherche des annonces Vinted', inline: false },
-        { name: '!vinted help', value: 'Affiche cette aide', inline: false }
-      );
-    await message.reply({ embeds: [helpEmbed] });
+    if (command === 'find') {
+      const brand = args.slice(1).join(' ') || 'Nike';
+      await message.reply(`🔍 Recherche "${brand}"...`);
+      await findAndPost(brand, message);
+    } else if (command === 'help') {
+      const helpEmbed = new EmbedBuilder()
+        .setTitle('🛍️ Vinqor - Aide')
+        .setColor('#00B4D8')
+        .addFields(
+          { name: '!vinted find [marque]', value: 'Cherche des annonces Vinted', inline: false },
+          { name: '!vinted help', value: 'Affiche cette aide', inline: false }
+        );
+      await message.reply({ embeds: [helpEmbed], allowedMentions: { repliedUser: false } });
+    }
+  } catch (error) {
+    console.error('Erreur:', error.message);
+    await message.reply(`❌ Erreur: ${error.message}`).catch(() => {});
   }
 });
 
