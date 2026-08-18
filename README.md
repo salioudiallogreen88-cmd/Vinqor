@@ -1,8 +1,1 @@
 # Vinqor
-cd /tmp/vinqor-bot
-git init
-git add .
-git commit -m "Vinqor bot initial"
-git branch -M main
-git remote add origin https://github.com/salioudiallogreen88-cmd/Vinqor.git
-git push -u origin main
